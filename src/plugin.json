@@ -19,7 +19,10 @@
       { "name": "Report an issue", "url": "https://github.com/IT-BAER/itbaer-goom-panel/issues" },
       { "name": "License (GPL-3.0-or-later)", "url": "https://github.com/IT-BAER/itbaer-goom-panel/blob/main/LICENSE" }
     ],
-    "screenshots": [],
+    "screenshots": [
+      { "name": "Title screen", "path": "img/screenshot-title.png" },
+      { "name": "Gameplay", "path": "img/screenshot-gameplay.png" }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },
