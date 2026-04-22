@@ -21,7 +21,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   const styles = useStyles2(getStyles);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<EngineHandle | null>(null);
-  const [status, setStatus] = useState<'loading' | 'running' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'running' | 'error' | 'duplicate'>('loading');
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [wadInfo, setWadInfo] = useState<ResolvedWad | null>(null);
 
@@ -29,9 +29,6 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
     let cancelled = false;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    // Engine runs once per page (single global Module). If a previous panel
-    // instance owns it, skip remount — user must reload to switch WADs in v1.
     if (handleRef.current) return;
 
     if (!options.autoStart) {
@@ -61,7 +58,16 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
           return;
         }
         handleRef.current = handle;
-        setStatus('running');
+        if (!handle.live) {
+          setStatus('duplicate');
+          setErrMsg(handle.reason ?? 'Engine already running elsewhere.');
+          return;
+        }
+        // Give the glue a moment to init, then assume running.
+        // (We can't observe callMain directly — the build doesn't export it.)
+        setTimeout(() => {
+          if (!cancelled) setStatus('running');
+        }, 800);
       } catch (err) {
         if (cancelled) return;
         setStatus('error');
@@ -71,9 +77,8 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
 
     return () => {
       cancelled = true;
-      // Do not dispose here: the engine is single-instance per page, and
-      // Grafana re-mounts the panel on any size/config tweak. Disposing would
-      // kill the game mid-play. Full lifecycle returns with MODULARIZE in v2.
+      // Do not dispose here: engine is single-instance per page; Grafana
+      // re-mounts the panel on resize/config tweaks and we'd kill the game.
     };
   }, [options]);
 
@@ -96,6 +101,12 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
               <div className={styles.sub}>
                 {wadInfo ? `WAD: ${wadInfo.name}` : 'Fetching WAD + engine'}
               </div>
+            </>
+          )}
+          {status === 'duplicate' && (
+            <>
+              <div className={styles.title}>Only one Goom at a time</div>
+              <div className={styles.sub}>{errMsg}</div>
             </>
           )}
           {status === 'error' && (
@@ -147,6 +158,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
   sub: css`
     font-size: 12px;
     opacity: 0.75;
+    max-width: 320px;
   `,
   err: css`
     margin-top: 8px;

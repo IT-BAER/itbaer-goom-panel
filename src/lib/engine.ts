@@ -1,14 +1,13 @@
 /**
  * Emscripten Module loader for cloudflare/doom-wasm.
  *
- * Responsibilities:
- *   - Fetch doom.wasm binary (and doom.js glue) from the plugin's public path.
- *   - Fetch the selected IWAD (bundled Freedoom, IndexedDB-cached, or URL).
- *   - Mount the WAD into Emscripten's MEMFS at a known path and call main().
- *   - Expose a disposable handle so the panel can re-mount on option changes.
- *
- * The engine itself is chocolate-doom; we do not patch it. We drive it via
- * Module config (canvas, arguments, preRun, FS writes).
+ * Design notes:
+ *   - The upstream build flags (configure.ac) set INVOKE_RUN=1 and do NOT
+ *     export `callMain` on Module. So we rely on the glue's own auto-start
+ *     path: set `Module.arguments`, mount the WAD in `preRun`, let the glue
+ *     call main() itself after wasm init.
+ *   - The glue is non-MODULARIZE; it mutates `window.Module`. Only one engine
+ *     instance can live per page, so we enforce a singleton guard.
  */
 import type { ControlPreset } from '../types';
 import { ASSET_URLS } from './assets';
@@ -16,7 +15,6 @@ import { ASSET_URLS } from './assets';
 export interface EngineStartOptions {
   canvas: HTMLCanvasElement;
   wad: ArrayBuffer;
-  /** File name the engine sees (must match the -iwad arg). */
   wadFilename?: string;
   muted?: boolean;
   controls?: ControlPreset;
@@ -25,17 +23,14 @@ export interface EngineStartOptions {
 }
 
 export interface EngineHandle {
-  /** Stop the engine and release Module handles. Safe to call more than once. */
+  live: boolean;
+  reason?: string;
   dispose: () => void;
-  /** True once the game has called `callMain`. */
-  running: () => boolean;
 }
 
-// Minimal Emscripten Module shape we actually use.
 interface EmscriptenModule {
   canvas: HTMLCanvasElement;
-  noInitialRun: boolean;
-  noExitRuntime: boolean;
+  noExitRuntime?: boolean;
   arguments?: string[];
   preRun?: Array<() => void>;
   onRuntimeInitialized?: () => void;
@@ -44,22 +39,17 @@ interface EmscriptenModule {
   locateFile?: (path: string, prefix: string) => string;
   print?: (s: string) => void;
   printErr?: (s: string) => void;
-  FS: {
-    writeFile: (path: string, data: Uint8Array) => void;
-  };
-  callMain: (args: string[]) => number;
-  exit?: (status: number) => void;
+  FS: { writeFile: (path: string, data: Uint8Array) => void };
 }
 
+let engineClaimed = false;
 let scriptLoaded = false;
 
 function loadGlueScript(src: string): Promise<void> {
-  if (scriptLoaded) return Promise.resolve();
+  if (scriptLoaded) {
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
-    // The Emscripten glue uses IIFE / ESM-style depending on build flags;
-    // the cloudflare build exposes itself on `window` as `Module` factory via
-    // the default (non-MODULARIZE) template. Re-loading the script attaches
-    // to window; we keep a single-load guard for safety.
     const s = document.createElement('script');
     s.src = src;
     s.async = true;
@@ -73,14 +63,31 @@ function loadGlueScript(src: string): Promise<void> {
 }
 
 export async function startEngine(opts: EngineStartOptions): Promise<EngineHandle> {
-  const wadName = opts.wadFilename ?? 'active.wad';
-  const wasmBinary = await (await fetch(ASSET_URLS.wasmBin())).arrayBuffer();
+  if (engineClaimed) {
+    return {
+      live: false,
+      reason: 'Another Goom panel on this page already owns the engine.',
+      dispose: () => void 0,
+    };
+  }
+  engineClaimed = true;
 
-  // Load the glue script. (cloudflare/doom-wasm default build is non-MODULARIZE:
-  // it expects a global `Module` that it mutates. We pre-populate window.Module.)
+  const wadName = opts.wadFilename ?? 'active.wad';
+
+  let wasmBinary: ArrayBuffer;
+  try {
+    const res = await fetch(ASSET_URLS.wasmBin());
+    if (!res.ok) {
+      throw new Error(`wasm fetch ${res.status}`);
+    }
+    wasmBinary = await res.arrayBuffer();
+  } catch (err) {
+    engineClaimed = false;
+    throw err;
+  }
+
   const pending: Partial<EmscriptenModule> = {
     canvas: opts.canvas,
-    noInitialRun: true,
     noExitRuntime: true,
     wasmBinary,
     arguments: [
@@ -91,74 +98,23 @@ export async function startEngine(opts: EngineStartOptions): Promise<EngineHandl
     ],
     preRun: [
       () => {
-        const fs = (pending as EmscriptenModule).FS;
-        fs.writeFile(`/${wadName}`, new Uint8Array(opts.wad));
+        const mod = (window as unknown as { Module: EmscriptenModule }).Module;
+        mod.FS.writeFile(`/${wadName}`, new Uint8Array(opts.wad));
       },
     ],
     print: (t: string) => opts.onStdout?.(t),
     printErr: (t: string) => opts.onStdout?.(`[err] ${t}`),
     onAbort: (what) => opts.onError?.(what),
-    locateFile: (path: string) => {
-      // doom.js tries to resolve doom.wasm next to itself by default; we serve
-      // from the same plugin public/wasm/ path and also pass wasmBinary above
-      // so this callback is primarily defensive.
-      if (path.endsWith('.wasm')) return ASSET_URLS.wasmBin();
-      return path;
-    },
+    locateFile: (path: string) => (path.endsWith('.wasm') ? ASSET_URLS.wasmBin() : path),
   };
 
-  // Expose as window.Module *before* loading the script (non-MODULARIZE contract).
   (window as unknown as { Module: Partial<EmscriptenModule> }).Module = pending;
 
   await loadGlueScript(ASSET_URLS.wasmJs());
 
-  // After the glue script runs, `Module` on window is the hydrated instance.
-  const mod = (window as unknown as { Module: EmscriptenModule }).Module;
-
-  let running = false;
-  let disposed = false;
-
-  await new Promise<void>((resolve, reject) => {
-    // If the runtime is already initialized (script loaded synchronously), call now.
-    const origInit = mod.onRuntimeInitialized;
-    mod.onRuntimeInitialized = () => {
-      try {
-        origInit?.();
-        if (disposed) return;
-        mod.callMain(mod.arguments ?? []);
-        running = true;
-        resolve();
-      } catch (err) {
-        reject(err);
-      }
-    };
-    // Safety net: Emscripten sets FS during preRun; if the script already
-    // finished initializing before we assigned the hook, force-start.
-    setTimeout(() => {
-      if (!running && !disposed) {
-        try {
-          mod.callMain(mod.arguments ?? []);
-          running = true;
-          resolve();
-        } catch {
-          /* ignore — waited path will either resolve or error on its own */
-        }
-      }
-    }, 2000);
-  });
-
   return {
-    running: () => running,
+    live: true,
     dispose: () => {
-      if (disposed) return;
-      disposed = true;
-      try {
-        mod.exit?.(0);
-      } catch {
-        /* ignore */
-      }
-      // Best-effort: drop the global. The engine is single-instance per page;
-      // remounting requires a page reload. A future v2 could use MODULARIZE.
       try {
         delete (window as unknown as { Module?: unknown }).Module;
       } catch {
