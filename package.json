@@ -23,6 +23,9 @@
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
+    "prebuild": "npm run fetch:freedoom",
+    "predev": "npm run fetch:freedoom",
+    "fetch:freedoom": "node scripts/fetch-freedoom.cjs",
     "test": "jest --watch --onlyChanged",
     "test:ci": "jest --passWithNoTests --maxWorkers 4",
     "typecheck": "tsc --noEmit",

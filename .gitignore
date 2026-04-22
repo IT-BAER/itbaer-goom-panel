@@ -53,3 +53,6 @@ src/wasm/doom.js
 src/wasm/doom.wasm
 # emsdk working dirs
 vendor/doom-wasm/build/
+
+# fetch-freedoom cache (download cache, not committed)
+.cache/
