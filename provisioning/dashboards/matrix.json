@@ -1,0 +1,106 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 2,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 0 },
+      "id": 10,
+      "options": {
+        "wadSource": "freedoom",
+        "wadUrl": "",
+        "wadSha": "",
+        "controls": "wasd",
+        "muteOnLoad": true,
+        "autoStart": true
+      },
+      "title": "Freedoom / WASD / mute / autoStart",
+      "type": "itbaer-goom-panel"
+    },
+    {
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 0 },
+      "id": 11,
+      "options": {
+        "wadSource": "freedoom",
+        "wadUrl": "",
+        "wadSha": "",
+        "controls": "vanilla",
+        "muteOnLoad": true,
+        "autoStart": true
+      },
+      "title": "Freedoom / vanilla / mute / autoStart",
+      "type": "itbaer-goom-panel"
+    },
+    {
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 10 },
+      "id": 12,
+      "options": {
+        "wadSource": "freedoom",
+        "wadUrl": "",
+        "wadSha": "",
+        "controls": "wasd",
+        "muteOnLoad": false,
+        "autoStart": true
+      },
+      "title": "Freedoom / WASD / unmuted / autoStart",
+      "type": "itbaer-goom-panel"
+    },
+    {
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 10 },
+      "id": 13,
+      "options": {
+        "wadSource": "freedoom",
+        "wadUrl": "",
+        "wadSha": "",
+        "controls": "wasd",
+        "muteOnLoad": true,
+        "autoStart": false
+      },
+      "title": "Freedoom / WASD / mute / no-autoStart",
+      "type": "itbaer-goom-panel"
+    },
+    {
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 20 },
+      "id": 14,
+      "options": {
+        "wadSource": "url",
+        "wadUrl": "http://localhost:3001/public/plugins/itbaer-goom-panel/public/wads/freedoom1.wad",
+        "wadSha": "",
+        "controls": "wasd",
+        "muteOnLoad": true,
+        "autoStart": true
+      },
+      "title": "URL / WASD / mute / autoStart",
+      "type": "itbaer-goom-panel"
+    },
+    {
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 20 },
+      "id": 15,
+      "options": {
+        "wadSource": "url",
+        "wadUrl": "http://localhost:3001/public/plugins/itbaer-goom-panel/does-not-exist.wad",
+        "wadSha": "",
+        "controls": "wasd",
+        "muteOnLoad": true,
+        "autoStart": true
+      },
+      "title": "URL / bad URL (expected error)",
+      "type": "itbaer-goom-panel"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Goom matrix",
+  "uid": "goom-matrix-0001",
+  "version": 1,
+  "weekStart": ""
+}
