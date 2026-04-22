@@ -8,7 +8,9 @@ right there, in the browser, inside the panel. The panel ships with
 configuration, no uploads. Bring your own IWAD/PWAD if you want to run a
 different game.
 
-![screenshot placeholder](src/img/screenshots/placeholder.png)
+![Gameplay screenshot](src/img/screenshot-gameplay.png)
+
+![Title screen](src/img/screenshot-title.png)
 
 ## Features
 
