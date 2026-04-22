@@ -33,6 +33,10 @@ export default defineConfig([
       'playwright/.auth/',
       '**/.idea',
       '**/.eslintcache',
+      // Third-party / generated artifacts that are not our source to lint
+      'vendor/**',
+      'src/wasm/**',
+      'src/public/wads/**',
     ],
   },
   ...baseConfig,

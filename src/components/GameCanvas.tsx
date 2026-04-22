@@ -26,28 +26,29 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   const [status, setStatus] = useState<'loading' | 'running' | 'error' | 'duplicate'>('loading');
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [wadInfo, setWadInfo] = useState<ResolvedWad | null>(null);
-  const [audioLocked, setAudioLocked] = useState(false);
+  const [userUnlockedAudio, setUserUnlockedAudio] = useState(false);
+  // Autoplay policy: unmuted engine needs a user gesture. Show the hint
+  // whenever the panel would start unmuted and the user hasn't clicked yet.
+  const audioLocked =
+    options.autoStart && !options.muteOnLoad && !userUnlockedAudio && status === 'loading';
 
   useEffect(() => {
     let cancelled = false;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    if (handleRef.current) return;
+    if (!canvas) {return;}
+    if (handleRef.current) {return;}
 
     if (!options.autoStart) {
-      setStatus('loading');
+      // Initial status is already 'loading'; nothing else to do when
+      // autoStart is off — the user will trigger engine boot later.
       return;
     }
-
-    // Surface the "click to enable sound" hint whenever the panel launches
-    // unmuted without a prior user gesture in this document.
-    setAudioLocked(!options.muteOnLoad);
 
     (async () => {
       try {
         setStatus('loading');
         const wad = await resolveWad(options);
-        if (cancelled) return;
+        if (cancelled) {return;}
         setWadInfo(wad);
         const handle = await startEngine({
           canvas,
@@ -73,10 +74,10 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
         // Give the glue a moment to init, then assume running.
         // (We can't observe callMain directly — the build doesn't export it.)
         setTimeout(() => {
-          if (!cancelled) setStatus('running');
+          if (!cancelled) {setStatus('running');}
         }, 800);
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled) {return;}
         setStatus('error');
         setErrMsg(err instanceof Error ? err.message : String(err));
       }
@@ -98,16 +99,16 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
         height={Math.max(200, Math.floor(height))}
         tabIndex={0}
         aria-label="Classic FPS game"
-        onClick={() => setAudioLocked(false)}
-        onKeyDown={() => setAudioLocked(false)}
+        onClick={() => setUserUnlockedAudio(true)}
+        onKeyDown={() => setUserUnlockedAudio(true)}
         onContextMenu={(e) => e.preventDefault()}
       />
       <Hud
         containerRef={wrapRef}
         running={status === 'running'}
-        audioLocked={audioLocked && status !== 'error' && status !== 'duplicate'}
+        audioLocked={audioLocked}
         onAudioUnlock={() => {
-          setAudioLocked(false);
+          setUserUnlockedAudio(true);
           canvasRef.current?.focus();
         }}
       />

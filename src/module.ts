@@ -1,6 +1,5 @@
 import { PanelPlugin } from '@grafana/data';
-import type { GoomOptions } from './types';
-import { defaultGoomOptions } from './types';
+import { defaultGoomOptions, type GoomOptions } from './types';
 import { GoomPanel } from './components/GoomPanel';
 
 export const plugin = new PanelPlugin<GoomOptions>(GoomPanel).setPanelOptions((builder) => {
