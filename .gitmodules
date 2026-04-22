@@ -1,0 +1,3 @@
+[submodule "vendor/doom-wasm"]
+	path = vendor/doom-wasm
+	url = https://github.com/cloudflare/doom-wasm.git

@@ -21,11 +21,14 @@
     "game"
   ],
   "scripts": {
-    "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
+    "build": "webpack -c ./.config/webpack/webpack.config.ts --env production && node scripts/copy-assets.cjs",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
     "prebuild": "npm run fetch:freedoom",
     "predev": "npm run fetch:freedoom",
     "fetch:freedoom": "node scripts/fetch-freedoom.cjs",
+    "build:wasm": "node scripts/build-wasm.cjs",
+    "build:wasm:clean": "node scripts/build-wasm.cjs --clean",
+    "postbuild:wasm": "node scripts/copy-assets.cjs",
     "test": "jest --watch --onlyChanged",
     "test:ci": "jest --passWithNoTests --maxWorkers 4",
     "typecheck": "tsc --noEmit",

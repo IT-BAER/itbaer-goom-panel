@@ -1,0 +1,16 @@
+# Normalize line endings for doom-wasm source tree: must stay LF regardless
+# of Windows autocrlf settings, because autoconf/emmake parse these and the
+# dependency parser looks up literal filenames that can contain trailing \r.
+vendor/doom-wasm/** text=lf eol=lf
+vendor/doom-wasm/** -text
+vendor/doom-wasm/**/*.c text eol=lf
+vendor/doom-wasm/**/*.h text eol=lf
+vendor/doom-wasm/**/*.m4 text eol=lf
+vendor/doom-wasm/**/*.am text eol=lf
+vendor/doom-wasm/**/*.in text eol=lf
+vendor/doom-wasm/**/*.ac text eol=lf
+vendor/doom-wasm/**/*.sh text eol=lf
+# Freedoom WAD is binary.
+src/public/wads/*.wad binary
+# Built wasm artifact is binary.
+src/wasm/*.wasm binary
