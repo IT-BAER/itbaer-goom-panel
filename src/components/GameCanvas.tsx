@@ -6,6 +6,7 @@ import type { GrafanaTheme2 } from '@grafana/data';
 import type { GoomOptions } from '../types';
 import { startEngine, type EngineHandle } from '../lib/engine';
 import { resolveWad, type ResolvedWad } from '../lib/resolveWad';
+import { Hud } from './Hud';
 
 interface Props {
   options: GoomOptions;
@@ -20,10 +21,12 @@ interface Props {
 export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   const styles = useStyles2(getStyles);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const handleRef = useRef<EngineHandle | null>(null);
   const [status, setStatus] = useState<'loading' | 'running' | 'error' | 'duplicate'>('loading');
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [wadInfo, setWadInfo] = useState<ResolvedWad | null>(null);
+  const [audioLocked, setAudioLocked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +38,10 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
       setStatus('loading');
       return;
     }
+
+    // Surface the "click to enable sound" hint whenever the panel launches
+    // unmuted without a prior user gesture in this document.
+    setAudioLocked(!options.muteOnLoad);
 
     (async () => {
       try {
@@ -83,7 +90,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   }, [options]);
 
   return (
-    <div className={styles.wrap} style={{ width, height }}>
+    <div ref={wrapRef} className={styles.wrap} style={{ width, height }}>
       <canvas
         ref={canvasRef}
         className={styles.canvas}
@@ -91,7 +98,18 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
         height={Math.max(200, Math.floor(height))}
         tabIndex={0}
         aria-label="Classic FPS game"
+        onClick={() => setAudioLocked(false)}
+        onKeyDown={() => setAudioLocked(false)}
         onContextMenu={(e) => e.preventDefault()}
+      />
+      <Hud
+        containerRef={wrapRef}
+        running={status === 'running'}
+        audioLocked={audioLocked && status !== 'error' && status !== 'duplicate'}
+        onAudioUnlock={() => {
+          setAudioLocked(false);
+          canvasRef.current?.focus();
+        }}
       />
       {status !== 'running' && (
         <div className={styles.overlay} role="status" aria-live="polite">
