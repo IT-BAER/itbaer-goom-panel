@@ -3,8 +3,7 @@ import { css } from '@emotion/css';
 import { useStyles2 } from '@grafana/ui';
 import type { GrafanaTheme2, PanelProps } from '@grafana/data';
 
-import type { GoomOptions } from '../types';
-import { defaultGoomOptions } from '../types';
+import { defaultGoomOptions, type GoomOptions } from '../types';
 import { GameCanvas } from './GameCanvas';
 
 type Props = PanelProps<GoomOptions>;

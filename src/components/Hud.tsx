@@ -38,7 +38,7 @@ export const Hud: React.FC<Props> = ({ containerRef, running, audioLocked, onAud
 
   const toggleFullscreen = useCallback(async () => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) {return;}
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
@@ -52,7 +52,7 @@ export const Hud: React.FC<Props> = ({ containerRef, running, audioLocked, onAud
 
   const onFilePick = useCallback(async (ev: React.ChangeEvent<HTMLInputElement>) => {
     const file = ev.target.files?.[0];
-    if (!file) return;
+    if (!file) {return;}
     try {
       const bytes = await file.arrayBuffer();
       const sha = await sha1Hex(bytes);
@@ -72,7 +72,7 @@ export const Hud: React.FC<Props> = ({ containerRef, running, audioLocked, onAud
     } catch (err) {
       setUploadMsg(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      if (fileRef.current) fileRef.current.value = '';
+      if (fileRef.current) {fileRef.current.value = '';}
     }
   }, []);
 

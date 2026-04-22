@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable */
+ 
 // Cross-platform launcher: dispatches to the PowerShell script on Windows
 // and the bash script elsewhere. Kept free of dependencies so `npm install`
 // isn't needed to run it.

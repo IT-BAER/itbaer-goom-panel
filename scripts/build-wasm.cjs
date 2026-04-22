@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable */
+ 
 "use strict";
 
 const { spawnSync } = require("node:child_process");
