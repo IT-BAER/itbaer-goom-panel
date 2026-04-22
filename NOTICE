@@ -1,0 +1,60 @@
+itbaer-goom-panel
+Copyright (C) 2026 IT-BAER
+
+This plugin is licensed under the GNU General Public License, version 3 or
+later; see LICENSE for the full license text.
+
+================================================================================
+Third-party components included, bundled, or loaded at runtime
+================================================================================
+
+1. id Tech 1 engine (a.k.a. DOOM engine source code)
+   - Original author: id Software, John Carmack et al.
+   - Released under GPL-2.0-or-later on 1999-10-03.
+   - Used via the chocolate-doom source port and the cloudflare/doom-wasm
+     Emscripten build thereof.
+   - Upstream: https://github.com/chocolate-doom/chocolate-doom
+   - WebAssembly build: https://github.com/cloudflare/doom-wasm
+
+2. chocolate-doom
+   - License: GPL-2.0-or-later
+   - Copyright: Simon Howard and contributors
+   - Upstream: https://github.com/chocolate-doom/chocolate-doom
+
+3. cloudflare/doom-wasm
+   - License: GPL-2.0-or-later (inherited from chocolate-doom)
+   - Copyright: Cloudflare and contributors
+   - Upstream: https://github.com/cloudflare/doom-wasm
+   - Distributed as pre-built artifacts (doom.js, doom.wasm) inside this
+     plugin's bundle.
+
+4. Freedoom
+   - License: Modified BSD (3-clause-like); see
+     https://github.com/freedoom/freedoom/blob/master/COPYING.adoc
+   - Copyright: The Freedoom authors
+   - Upstream: https://freedoom.github.io/
+   - The file freedoom1.wad from Freedoom 0.13.0 is bundled with this plugin
+     as the default playable IWAD so the panel runs immediately without any
+     user-supplied assets.
+
+================================================================================
+Trademarks and non-affiliation
+================================================================================
+
+This plugin is an independent, open-source project.
+
+- "Goom" is the project name for this plugin.
+- DOOM(R) is a registered trademark of ZeniMax Media Inc., owned by Microsoft
+  Corporation. This plugin is not affiliated with, authorized by, endorsed by,
+  or in any way connected to id Software, Bethesda Softworks, ZeniMax Media,
+  or Microsoft Corporation.
+- Doomguy, Cacodemon, Imp, and other DOOM(R) characters and sprites are
+  copyrighted works of ZeniMax Media Inc. and are NOT redistributed with this
+  plugin.
+- "Grafana" is a registered trademark of Raintank, Inc. (d/b/a Grafana Labs).
+  This plugin is an unofficial community plugin and is not affiliated with
+  Grafana Labs.
+
+References to DOOM(R) in this project's documentation are strictly nominative
+and descriptive: the plugin is compatible with user-supplied DOOM(R) WAD files
+via the open-source id Tech 1 engine source code (GPL-2.0-or-later).

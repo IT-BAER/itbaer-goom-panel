@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Goom",
+  "id": "itbaer-goom-panel",
+  "info": {
+    "keywords": ["panel", "goom", "doom", "id-tech-1", "freedoom", "game"],
+    "description": "Play the classic id Tech 1 engine inside a Grafana panel. Ships with Freedoom; supports user-supplied WADs.",
+    "author": {
+      "name": "IT-BAER",
+      "url": "https://github.com/IT-BAER"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      { "name": "GitHub", "url": "https://github.com/IT-BAER/itbaer-goom-panel" },
+      { "name": "Report an issue", "url": "https://github.com/IT-BAER/itbaer-goom-panel/issues" },
+      { "name": "License (GPL-3.0-or-later)", "url": "https://github.com/IT-BAER/itbaer-goom-panel/blob/main/LICENSE" }
+    ],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=12.3.0",
+    "plugins": []
+  }
+}
