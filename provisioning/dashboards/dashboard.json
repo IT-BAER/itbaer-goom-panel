@@ -35,9 +35,12 @@
       },
       "id": 1,
       "options": {
-        "seriesCountSize": "sm",
-        "showSeriesCount": false,
-        "text": "Default value of text input option"
+        "wadSource": "freedoom",
+        "wadUrl": "",
+        "wadSha": "",
+        "controls": "wasd",
+        "muteOnLoad": true,
+        "autoStart": true
       },
       "targets": [
         {
@@ -66,9 +69,12 @@
       },
       "id": 2,
       "options": {
-        "seriesCountSize": "sm",
-        "showSeriesCount": false,
-        "text": "Default value of text input option"
+        "wadSource": "freedoom",
+        "wadUrl": "",
+        "wadSha": "",
+        "controls": "vanilla",
+        "muteOnLoad": true,
+        "autoStart": true
       },
       "targets": [
         {
