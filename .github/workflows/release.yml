@@ -14,16 +14,55 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    env:
+      GRAFANA_ACCESS_POLICY_TOKEN: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          submodules: recursive
 
-      - uses: grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
-        # Uncomment to enable plugin signing
-        # (For more info on how to generate the access policy token see https://grafana.com/developers/plugin-tools/publish-a-plugin/sign-a-plugin#generate-an-access-policy-token)
-        #with:
-        # Make sure to save the token in your repository secrets
-        #policy_token: $
-        # Usage of GRAFANA_API_KEY is deprecated, prefer `policy_token` option above
-        #grafana_token: $
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch Freedoom IWAD
+        run: npm run fetch:freedoom
+
+      - name: Build doom-wasm (Emscripten via Docker)
+        run: npm run build:wasm
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Resolve plugin metadata
+        id: meta
+        run: |
+          PLUGIN_ID=$(node -p "require('./dist/plugin.json').id")
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "id=$PLUGIN_ID"                   >> $GITHUB_OUTPUT
+          echo "version=$VERSION"                >> $GITHUB_OUTPUT
+          echo "zip=${PLUGIN_ID}-${VERSION}.zip" >> $GITHUB_OUTPUT
+
+      - name: Sign plugin
+        if: env.GRAFANA_ACCESS_POLICY_TOKEN != ''
+        run: npm run sign
+
+      - name: Package ZIP
+        run: |
+          mv dist "${{ steps.meta.outputs.id }}"
+          zip -r "${{ steps.meta.outputs.zip }}" "${{ steps.meta.outputs.id }}"
+          sha1sum "${{ steps.meta.outputs.zip }}" > "${{ steps.meta.outputs.zip }}.sha1"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.meta.outputs.zip }}
+            ${{ steps.meta.outputs.zip }}.sha1
+          generate_release_notes: true
