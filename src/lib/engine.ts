@@ -51,8 +51,6 @@ interface EmscriptenModule {
   exit?: (status: number) => void;
 }
 
-type DoomFactory = (mod: Partial<EmscriptenModule>) => Promise<EmscriptenModule>;
-
 let scriptLoaded = false;
 
 function loadGlueScript(src: string): Promise<void> {
