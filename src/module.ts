@@ -46,6 +46,7 @@ export const plugin = new PanelPlugin<GoomOptions>(GoomPanel).setPanelOptions((b
     .addBooleanSwitch({
       path: 'muteOnLoad',
       name: 'Mute on load',
+      description: 'Start the engine with sound effects disabled (-nosound). Music is always off in this build.',
       defaultValue: defaultGoomOptions.muteOnLoad,
     })
     .addBooleanSwitch({
@@ -53,5 +54,11 @@ export const plugin = new PanelPlugin<GoomOptions>(GoomPanel).setPanelOptions((b
       name: 'Auto-start',
       description: 'If off, the panel shows a "Press play" splash instead of booting immediately.',
       defaultValue: defaultGoomOptions.autoStart,
+    })
+    .addBooleanSwitch({
+      path: 'enableMouse',
+      name: 'Mouse capture',
+      description: 'Enable in-game mouse look via pointer lock.',
+      defaultValue: true,
     });
 });

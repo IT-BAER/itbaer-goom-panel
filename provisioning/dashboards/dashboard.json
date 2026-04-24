@@ -27,7 +27,7 @@
         "wadUrl": "",
         "wadSha": "",
         "controls": "wasd",
-        "muteOnLoad": true,
+        "muteOnLoad": false,
         "autoStart": true
       },
       "title": "Goom",

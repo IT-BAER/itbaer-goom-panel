@@ -21,6 +21,10 @@ export interface GoomOptions {
   muteOnLoad: boolean;
   /** If false, panel shows a "Press Play" splash instead of auto-booting. */
   autoStart: boolean;
+  /** Game render size as a percentage of base 320×240 (100–500). */
+  gameScale: number;
+  /** Enable in-game mouse capture / pointer lock. */
+  enableMouse?: boolean;
 }
 
 export const defaultGoomOptions: GoomOptions = {
@@ -28,6 +32,8 @@ export const defaultGoomOptions: GoomOptions = {
   controls: 'wasd',
   muteOnLoad: false,
   autoStart: true,
+  gameScale: 325,
+  enableMouse: true,
 };
 
 /** Row stored in IndexedDB for a user-supplied WAD. */

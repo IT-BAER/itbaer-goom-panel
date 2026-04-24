@@ -12,19 +12,14 @@ interface Props {
   containerRef: React.RefObject<HTMLElement>;
   /** True when the engine is actively rendering (hide upload hint once playing). */
   running: boolean;
-  /** Show the "click to enable sound" hint for unmuted autoplay. */
-  audioLocked: boolean;
-  /** Called when the user clicks the canvas/hint to dismiss the audio hint. */
-  onAudioUnlock: () => void;
 }
 
 /**
- * In-panel overlay: fullscreen toggle, WAD upload, and audio-unlock hint.
- * Kept minimal on purpose — pause is available via the in-game `P` key,
- * and full audio mute requires invasive AudioContext patching which is
- * deferred to a later release.
+ * In-panel overlay: fullscreen toggle and WAD upload.
+ * Audio is controlled by the panel option `Mute on load` (applied on next
+ * engine boot / page reload). Pause is available via the in-game `P` key.
  */
-export const Hud: React.FC<Props> = ({ containerRef, running, audioLocked, onAudioUnlock }) => {
+export const Hud: React.FC<Props> = ({ containerRef, running }) => {
   const styles = useStyles2(getStyles);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [isFullscreen, setFullscreen] = useState(false);
@@ -78,16 +73,6 @@ export const Hud: React.FC<Props> = ({ containerRef, running, audioLocked, onAud
 
   return (
     <>
-      {audioLocked && (
-        <button
-          type="button"
-          className={styles.audioHint}
-          onClick={onAudioUnlock}
-          aria-label="Click to enable sound"
-        >
-          🔊 Click to enable sound
-        </button>
-      )}
       <div className={styles.hud}>
         <button
           type="button"
@@ -169,22 +154,6 @@ const getStyles = (theme: GrafanaTheme2) => ({
   `,
   file: css`
     display: none;
-  `,
-  audioHint: css`
-    position: absolute;
-    bottom: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    appearance: none;
-    border: 1px solid ${theme.colors.primary.border};
-    background: ${theme.colors.primary.main};
-    color: ${theme.colors.primary.contrastText};
-    padding: 6px 12px;
-    font-size: 12px;
-    border-radius: ${theme.shape.radius.default};
-    cursor: pointer;
-    z-index: 4;
-    pointer-events: auto;
   `,
   toast: css`
     position: absolute;
