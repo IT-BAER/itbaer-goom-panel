@@ -7,9 +7,8 @@ panel. It ships with [Freedoom](https://freedoom.github.io/), so a fresh panel
 boots straight into a playable game. Point it at your own IWAD or PWAD to run
 something else.
 
-![Gameplay screenshot](src/img/screenshot-gameplay.png)
+<img width="1278" height="965" alt="image" src="https://github.com/user-attachments/assets/de2042e1-147c-4b1c-9c0d-9d612186ec0a" />
 
-![Title screen](src/img/screenshot-title.png)
 
 ## Features
 
