@@ -31,6 +31,13 @@ First catalog release.
   next keypress. Separate from the `Mute on load` boot option.
 - Jest unit tests for the canvas fit, engine window args, and mute.
 
+### Security
+
+- Cleared every high and critical advisory the Grafana plugin validator reports
+  against the lockfile: `npm audit fix`, plus `overrides` pinning `immutable`
+  to `^5.1.9` and `js-cookie` to `^3.0.8` (both reached only through
+  `@grafana/ui` and `@grafana/data`, neither is bundled).
+
 ### Changed
 
 - `vendor/doom-wasm` points at `IT-BAER/doom-wasm` branch `gp-doom`, which
