@@ -1,4 +1,5 @@
 import { test, expect } from '@grafana/plugin-e2e';
+import type { Locator } from '@playwright/test';
 
 /**
  * Matrix e2e: open each panel variant in panel-edit mode and verify the
@@ -6,7 +7,24 @@ import { test, expect } from '@grafana/plugin-e2e';
  * so the page-level singleton guard does not cross-fire between cases.
  */
 
-type Expectation = 'running' | 'loading-only' | 'error' | 'no-hard-error';
+type Expectation = 'running' | 'idle-only' | 'error' | 'no-hard-error';
+
+/**
+ * Fail with the panel's own error text rather than a bare count assertion.
+ * The overlay renders `errMsg` in a <pre>, which is the only place the real
+ * boot failure is reported; without this a CI failure says nothing usable.
+ */
+async function expectNoEngineError(panel: Locator) {
+  const error = panel.getByText('Engine failed to start');
+  if ((await error.count()) > 0) {
+    const detail = await panel
+      .locator('pre')
+      .first()
+      .innerText()
+      .catch(() => '(no detail rendered)');
+    throw new Error(`Engine failed to start. Panel reported: ${detail}`);
+  }
+}
 
 interface Case {
   id: string;
@@ -21,7 +39,7 @@ const cases: Case[] = [
   // gesture; the engine may stay in the loading overlay until audio is
   // unlocked. We only verify no hard engine error here.
   { id: '12', label: 'freedoom / wasd / unmuted / autoStart', expect: 'no-hard-error' },
-  { id: '13', label: 'freedoom / wasd / mute / autoStart=false', expect: 'loading-only' },
+  { id: '13', label: 'freedoom / wasd / mute / autoStart=false', expect: 'idle-only' },
   { id: '14', label: 'url / localhost freedoom / autoStart', expect: 'running' },
   { id: '15', label: 'url / 404 (expected error)', expect: 'error' },
 ];
@@ -47,16 +65,17 @@ for (const c of cases) {
       await canvas.click({ position: { x: 20, y: 20 } }).catch(() => {});
       // The overlay disappears once status flips to 'running'.
       // GameCanvas gives the glue 800ms to init before marking running.
-      await expect(panel.getByText('Engine failed to start')).toHaveCount(0);
+      await expectNoEngineError(panel);
       await expect(panel.getByText('Loading Goom…')).toHaveCount(0, { timeout: 25_000 });
-    } else if (c.expect === 'loading-only') {
-      // autoStart=false keeps the overlay at "Loading Goom…" (no engine boot).
-      await expect(panel.getByText('Loading Goom…')).toBeVisible();
-      await expect(panel.getByText('Engine failed to start')).toHaveCount(0);
+    } else if (c.expect === 'idle-only') {
+      // autoStart=false leaves status at 'idle', which renders the Play prompt.
+      // It never passes through 'loading' until the user clicks Play.
+      await expect(panel.getByText('Click play to load Freedoom and start the engine.')).toBeVisible();
+      await expectNoEngineError(panel);
     } else if (c.expect === 'no-hard-error') {
       // Autoplay-blocked scenarios: canvas present, no error overlay. The
       // engine may stay in "Loading Goom…" until a user gesture unlocks audio.
-      await expect(panel.getByText('Engine failed to start')).toHaveCount(0);
+      await expectNoEngineError(panel);
     } else {
       // Expected hard error (bad URL etc.).
       await expect(panel.getByText('Engine failed to start')).toBeVisible({ timeout: 15_000 });
