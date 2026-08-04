@@ -1,3 +1,4 @@
 [submodule "vendor/doom-wasm"]
 	path = vendor/doom-wasm
-	url = https://github.com/cloudflare/doom-wasm.git
+	url = https://github.com/IT-BAER/doom-wasm.git
+	branch = gp-doom
