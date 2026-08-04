@@ -56,5 +56,7 @@ vendor/doom-wasm/build/
 
 # fetch-freedoom cache (download cache, not committed)
 .cache/
-docker-compose.override.yaml  # local dev overrides (auto-picked by docker compose)
-.vscode/tasks.json
+# local dev overrides, auto-picked by docker compose
+docker-compose.override.yaml
+.vscode/
+
