@@ -5,6 +5,7 @@ import type { GrafanaTheme2 } from '@grafana/data';
 
 import type { StoredWad } from '../types';
 import { putWad } from '../lib/wadStore';
+import { isEngineMuted, setEngineMuted } from '../lib/engine';
 import { sha1Hex } from '../lib/sha1';
 
 interface Props {
@@ -12,23 +13,35 @@ interface Props {
   containerRef: React.RefObject<HTMLElement>;
   /** True when the engine is actively rendering (hide upload hint once playing). */
   running: boolean;
+  /** Initial state of the mute toggle, from the `Mute on load` panel option. */
+  mutedOnLoad: boolean;
 }
 
 /**
- * In-panel overlay: fullscreen toggle and WAD upload.
- * Audio is controlled by the panel option `Mute on load` (applied on next
- * engine boot / page reload). Pause is available via the in-game `P` key.
+ * In-panel overlay: fullscreen toggle, audio mute, and WAD upload.
+ * The mute button suspends the engine's AudioContext, so it takes effect
+ * immediately; the `Mute on load` panel option only applies on the next engine
+ * boot. Pause is available via the in-game `P` key.
  */
-export const Hud: React.FC<Props> = ({ containerRef, running }) => {
+export const Hud: React.FC<Props> = ({ containerRef, running, mutedOnLoad }) => {
   const styles = useStyles2(getStyles);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [isFullscreen, setFullscreen] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  const [muted, setMuted] = useState(() => isEngineMuted() || mutedOnLoad);
 
   useEffect(() => {
     const onFsChange = () => setFullscreen(document.fullscreenElement != null);
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleMuted = useCallback(() => {
+    setMuted((current) => {
+      const next = !current;
+      setEngineMuted(next);
+      return next;
+    });
   }, []);
 
   const toggleFullscreen = useCallback(async () => {
@@ -82,6 +95,16 @@ export const Hud: React.FC<Props> = ({ containerRef, running }) => {
           aria-label="Toggle fullscreen"
         >
           {isFullscreen ? '⤡' : '⤢'}
+        </button>
+        <button
+          type="button"
+          className={styles.btn}
+          onClick={toggleMuted}
+          title={muted ? 'Unmute audio' : 'Mute audio'}
+          aria-label="Toggle audio"
+          aria-pressed={muted}
+        >
+          {muted ? '🔇' : '🔊'}
         </button>
         <button
           type="button"

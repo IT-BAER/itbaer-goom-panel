@@ -1,6 +1,6 @@
 {
   "name": "itbaer-goom-panel",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Play the classic id Tech 1 engine inside a Grafana panel. Ships with Freedoom; supports user-supplied WADs.",
   "repository": {
     "type": "git",

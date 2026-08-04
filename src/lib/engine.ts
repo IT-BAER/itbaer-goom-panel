@@ -24,6 +24,20 @@ export interface EngineStartOptions {
   onError?: (err: unknown) => void;
 }
 
+/**
+ * Doom's own render size is 320x240 once aspect correction is on (the engine
+ * default). We ask for a whole multiple of that, expressed in CSS pixels so
+ * SDL's devicePixelRatio multiply lands back on the exact pixel grid.
+ */
+export function engineWindowArgs(gameScale?: number, dpr = window.devicePixelRatio || 1): string[] {
+  const scale = Math.min(500, Math.max(100, Number.isFinite(gameScale) ? Number(gameScale) : 325)) / 100;
+  const ratio = dpr > 0 ? dpr : 1;
+  return [
+    '-width', String(Math.max(320, Math.round((320 * scale) / ratio))),
+    '-height', String(Math.max(240, Math.round((240 * scale) / ratio))),
+  ];
+}
+
 export interface EngineHandle {
   live: boolean;
   reason?: string;
@@ -46,9 +60,11 @@ interface EmscriptenModule {
 
 let engineClaimed = false;
 let scriptLoaded = false;
-let glueScriptEl: HTMLScriptElement | null = null;
 
 let _audioCtx: AudioContext | null = null;
+// Single source of truth for runtime mute. Every path that resumes audio on a
+// user gesture must honour it, or clicking the game silently unmutes.
+let _muted = false;
 
 let persistentCanvas: HTMLCanvasElement | null = null;
 let parkingHost: HTMLDivElement | null = null;
@@ -121,6 +137,60 @@ export function primeEngineAudioContext(): void {
   }
 }
 
+/**
+ * Resume engine audio after a user gesture, unless the user has muted. The
+ * single entry point for this: resuming the SDL2 context directly bypasses the
+ * mute flag and makes clicking the game unmute it.
+ */
+export function resumeEngineAudio(): void {
+  primeEngineAudioContext();
+  applyMuteState();
+}
+
+/**
+ * Runtime mute. Silences the game by cutting SDL2's output node from the audio graph, with no
+ * engine restart. See applyMuteState for why suspending the context is wrong.
+ * Separate from the `Mute on load` option, which passes
+ * `-nosound` and can only take effect on the next boot.
+ */
+export function setEngineMuted(muted: boolean): void {
+  _muted = muted;
+  applyMuteState();
+}
+
+/** Current runtime mute state, so UI can render the right icon after a remount. */
+export function isEngineMuted(): boolean {
+  return _muted;
+}
+
+/**
+ * Mute by disconnecting SDL2's output node from the destination, NOT by
+ * suspending the AudioContext. Emscripten installs an `autoResumeAudioContext`
+ * handler that resumes the context on any keydown/mousedown, so a suspended
+ * context silently comes back the moment the player presses a key — the button
+ * would still read muted while sound returned. A graph edit survives that.
+ */
+function applyMuteState(): void {
+  const sdl = (window as unknown as {
+    Module?: { SDL2?: { audioContext?: AudioContext; audio?: { scriptProcessorNode?: AudioNode } } };
+  }).Module?.SDL2;
+  const node = sdl?.audio?.scriptProcessorNode;
+  const ctx = sdl?.audioContext;
+
+  if (!node || !ctx) {
+    return;
+  }
+  try {
+    if (_muted) {
+      node.disconnect();
+    } else {
+      node.connect(ctx.destination);
+    }
+  } catch {
+    // Node already disconnected or context torn down — nothing to do.
+  }
+}
+
 function loadGlueScript(src: string): Promise<void> {
   if (scriptLoaded) {
     return Promise.resolve();
@@ -131,7 +201,6 @@ function loadGlueScript(src: string): Promise<void> {
     s.async = true;
     s.onload = () => {
       scriptLoaded = true;
-      glueScriptEl = s;
       resolve();
     };
     s.onerror = () => reject(new Error(`Failed to load ${src}`));
@@ -189,19 +258,39 @@ function teardownEngine(): void {
  * be in the range 0..127, otherwise chocolate-doom silently rewrites them to
  * 0 during config load.
  */
-function buildDefaultCfg(preset: ControlPreset | undefined): string {
-  const wasd = preset !== 'vanilla';
-  const lines: Array<[string, string | number]> = [
+const cfgText = (lines: Array<[string, string | number]>) =>
+  lines.map(([k, v]) => `${k.padEnd(30)}${v}`).join('\n') + '\n';
+
+/**
+ * The engine splits its settings across TWO files: `doom_defaults_list` keys go
+ * in the main config, `extra_defaults_list` keys only in the extra config
+ * (`m_config.c`). Writing an extra key into the main file is silently ignored —
+ * that is why `novert` never took effect and vertical mouse kept moving the
+ * player. Must be passed as `-extraconfig`.
+ */
+function buildExtraCfg(): string {
+  return cfgText([
     ['use_libsamplerate', 0],
     ['force_software_renderer', 0],
     ['startup_delay', 0],
     ['show_diskicon', 1],
     ['grabmouse', 0],
     ['fullscreen', 0],
+    // Ignore all vertical mouse movement, so looking up/down never walks the
+    // player forward or back.
+    ['novert', 1],
+    // Must stay 1: the 4:3 render size it selects is what the canvas backbuffer
+    // is sized against (see DOOM_RENDER_HEIGHT = 240).
+    ['aspect_ratio_correct', 1],
+  ]);
+}
+
+function buildDefaultCfg(preset: ControlPreset | undefined): string {
+  const wasd = preset !== 'vanilla';
+  const lines: Array<[string, string | number]> = [
     ['sfx_volume', 8],
     ['music_volume', 8],
     ['show_messages', 1],
-    ['novert', 1],
     // In WASD preset, A/D must strafe (not turn); turning is handled by the
     // mouse (Arrow keys still turn as a fallback). Pinning key_left/key_right
     // to arrow scancodes keeps A/D exclusively on strafe.
@@ -229,9 +318,10 @@ function buildDefaultCfg(preset: ControlPreset | undefined): string {
     ['mouse_sensitivity', 5],
     ['mouseb_fire', 0],
     ['mouseb_strafe', 1],
+    // Middle mouse button, not vertical movement — kept off the Y axis.
     ['mouseb_forward', 2],
   ];
-  return lines.map(([k, v]) => `${k.padEnd(30)}${v}`).join('\n') + '\n';
+  return cfgText(lines);
 }
 
 export async function startEngine(opts: EngineStartOptions): Promise<EngineHandle> {
@@ -286,7 +376,8 @@ export async function startEngine(opts: EngineStartOptions): Promise<EngineHandl
     throw err;
   }
 
-  const cfgText = buildDefaultCfg(opts.controls);
+  const mainCfg = buildDefaultCfg(opts.controls);
+  const extraCfg = buildExtraCfg();
   const pending: Partial<EmscriptenModule> = {
     canvas: opts.canvas,
     noExitRuntime: true,
@@ -294,15 +385,21 @@ export async function startEngine(opts: EngineStartOptions): Promise<EngineHandl
     arguments: [
       '-iwad', `/${wadName}`,
       '-config', '/default.cfg',
+      '-extraconfig', '/extra.cfg',
       '-window',
       '-nogui',
+      // The engine owns the backbuffer: SDL sizes the canvas to these logical
+      // dimensions times devicePixelRatio. Without them it uses its 800x600
+      // default, which leaves unpainted bars wherever our canvas is bigger.
+      ...engineWindowArgs(opts.gameScale),
       ...(opts.muted ? ['-nosound', '-nomusic'] : ['-nomusic']),
     ],
     preRun: [
       () => {
         const mod = (window as unknown as { Module: EmscriptenModule }).Module;
         mod.FS.writeFile(`/${wadName}`, new Uint8Array(opts.wad));
-        mod.FS.writeFile('/default.cfg', new TextEncoder().encode(cfgText));
+        mod.FS.writeFile('/default.cfg', new TextEncoder().encode(mainCfg));
+        mod.FS.writeFile('/extra.cfg', new TextEncoder().encode(extraCfg));
       },
     ],
     print: (t: string) => opts.onStdout?.(t),

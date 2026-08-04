@@ -4,7 +4,7 @@ import { useStyles2 } from '@grafana/ui';
 import type { GrafanaTheme2 } from '@grafana/data';
 
 import type { GoomOptions } from '../types';
-import { getEngineCanvas, primeEngineAudioContext, startEngine, type EngineHandle } from '../lib/engine';
+import { getEngineCanvas, resumeEngineAudio, startEngine, type EngineHandle } from '../lib/engine';
 import { resolveWad, type ResolvedWad } from '../lib/resolveWad';
 import { Hud } from './Hud';
 
@@ -27,6 +27,8 @@ interface SyntheticKeyBinding {
 }
 
 const DOOM_RENDER_WIDTH = 320;
+// The engine defaults to aspect_ratio_correct, so it renders 320x240 (4:3), not
+// 320x200. Sizing the backbuffer at 200 cropped the top ~13% of every frame.
 const DOOM_RENDER_HEIGHT = 240;
 
 const getFixedCanvasBox = (gameScale: number) => {
@@ -37,27 +39,25 @@ const getFixedCanvasBox = (gameScale: number) => {
   };
 };
 
-const fitPreferredCanvasBox = (
+export const fitPreferredCanvasBox = (
   preferredWidth: number,
   preferredHeight: number,
   availableWidth: number,
   availableHeight: number
 ) => {
-  const safeAvailableWidth = Math.max(1, Math.floor(availableWidth));
-  const safeAvailableHeight = Math.max(1, Math.floor(availableHeight));
+  // Contain-fit: preserve the engine's 4:3 and let whichever axis runs out
+  // first decide the size, so the frame never overflows a narrow or a short
+  // panel. The caller centers the result with explicit left/top offsets.
+  const availW = Math.max(1, Math.floor(availableWidth));
+  const availH = Math.max(1, Math.floor(availableHeight));
+  const aspect = preferredWidth / preferredHeight;
 
-  if (safeAvailableWidth >= preferredWidth && safeAvailableHeight >= preferredHeight) {
-    return {
-      width: preferredWidth,
-      height: preferredHeight,
-    };
-  }
-
-  const scale = Math.min(safeAvailableWidth / preferredWidth, safeAvailableHeight / preferredHeight);
+  const height = Math.min(availH, Math.floor(availW / aspect));
+  const safeH = Math.max(1, height);
 
   return {
-    width: Math.max(1, Math.floor(preferredWidth * scale)),
-    height: Math.max(1, Math.floor(preferredHeight * scale)),
+    width: Math.max(1, Math.floor(safeH * aspect)),
+    height: safeH,
   };
 };
 
@@ -67,8 +67,10 @@ const fitPreferredCanvasBox = (
  */
 export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   const styles = useStyles2(getStyles);
+  const { autoStart, controls, enableMouse, gameScale, muteOnLoad, wadSha, wadSource, wadUrl } = options;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const keySinkRef = useRef<HTMLInputElement | null>(null);
+  const canvasWrapRef = useRef<HTMLDivElement | null>(null);
   const controlsArmedRef = useRef(false);
   const mouseLockedRef = useRef(false);
   const pressedMouseButtonsRef = useRef<Set<number>>(new Set());
@@ -79,26 +81,16 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   );
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [wadInfo, setWadInfo] = useState<ResolvedWad | null>(null);
-  const [userUnlockedAudio, setUserUnlockedAudio] = useState(false);
   const [mouseLocked, setMouseLocked] = useState(false);
-  const [mouseMessage, setMouseMessage] = useState<string | null>(null);
+  // Written but never rendered yet; kept so the capture diagnostics survive for a future toast.
+  const [, setMouseMessage] = useState<string | null>(null);
   const [controlsArmed, setControlsArmed] = useState(false);
-  const [engineLive, setEngineLive] = useState(false);
   const audioLocked = false;
   const inputCaptured = status === 'running' && controlsArmed;
-  const engineCanvasBox = getFixedCanvasBox(options.gameScale);
+  const engineCanvasBox = getFixedCanvasBox(gameScale);
   const [displayCanvasBox, setDisplayCanvasBox] = useState(engineCanvasBox);
   const focusKeySink = () => keySinkRef.current?.focus({ preventScroll: true });
-  const resumeEngineAudio = () => {
-    primeEngineAudioContext();
-    const mod = (window as unknown as {
-      Module?: { SDL2?: { audioContext?: { resume?: () => Promise<void> } } };
-    }).Module;
-
-    void mod?.SDL2?.audioContext?.resume?.().catch(() => undefined);
-  };
   const noteUserGesture = () => {
-    setUserUnlockedAudio(true);
     resumeEngineAudio();
   };
   const armControls = () => {
@@ -110,7 +102,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
     setControlsArmed(false);
     keySinkRef.current?.blur();
     canvasRef.current?.blur();
-    setMouseMessage(options.enableMouse === false ? null : 'Controls released. Click game canvas to capture again.');
+    setMouseMessage(enableMouse === false ? null : 'Controls released. Click game canvas to capture again.');
 
     if (exitPointerLock && document.pointerLockElement === canvasRef.current) {
       const mod = (window as unknown as {
@@ -164,7 +156,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   }, [engineCanvasBox.height, engineCanvasBox.width, height, width]);
 
   const getMouseButtonBinding = (button: number): SyntheticKeyBinding | null => {
-    const wasd = options.controls !== 'vanilla';
+    const wasd = controls !== 'vanilla';
     switch (button) {
       case 0:
         // Fire: must match key_fire in buildDefaultCfg — WASD=Space, vanilla=RCtrl.
@@ -203,8 +195,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
 
   const requestMouseCapture = async () => {
     const canvas = canvasRef.current;
-    if (!canvas || options.enableMouse === false) {return;}
-    setUserUnlockedAudio(true);
+    if (!canvas || enableMouse === false) {return;}
     focusKeySink();
     setMouseMessage('Click game again if browser asks for mouse capture.');
 
@@ -261,16 +252,16 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
         canvas,
         wad: wad.bytes,
         wadFilename: wad.name,
-        muted: options.muteOnLoad,
-        controls: options.controls,
-        enableMouse: options.enableMouse,
+        muted: muteOnLoad,
+        controls,
+        enableMouse,
+        gameScale,
         onError: (err) => {
           setStatus('error');
           setErrMsg(String(err));
         },
       });
       handleRef.current = handle;
-      setEngineLive(true);
       if (!handle.live) {
         setStatus('duplicate');
         setErrMsg(handle.reason ?? 'Engine already running elsewhere.');
@@ -284,7 +275,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
   };
 
   useEffect(() => {
-    if (!options.autoStart) {return;}
+    if (!autoStart) {return;}
     if (audioLocked) {return;}
     if (handleRef.current) {return;}
     let cancelled = false;
@@ -298,10 +289,10 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
           canvas: canvasRef.current!,
           wad: wad.bytes,
           wadFilename: wad.name,
-          muted: options.muteOnLoad,
-          controls: options.controls,
-          enableMouse: options.enableMouse,
-          gameScale: options.gameScale,
+          muted: muteOnLoad,
+          controls,
+          enableMouse,
+          gameScale,
           onError: (err) => {
             setStatus('error');
             setErrMsg(String(err));
@@ -312,7 +303,6 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
           return;
         }
         handleRef.current = handle;
-        setEngineLive(true);
         if (!handle.live) {
           setStatus('duplicate');
           setErrMsg(handle.reason ?? 'Engine already running elsewhere.');
@@ -331,7 +321,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
     return () => {
       cancelled = true;
     };
-  }, [audioLocked, options]);
+  }, [audioLocked, autoStart, controls, enableMouse, gameScale, muteOnLoad, options, wadSha, wadSource, wadUrl]);
 
   useEffect(() => {
     const pressedButtons = pressedMouseButtonsRef.current;
@@ -341,7 +331,6 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
       pressedButtons.clear();
       handleRef.current?.dispose();
       handleRef.current = null;
-      setEngineLive(false);
       if (document.fullscreenElement === wrap) {
         void document.exitFullscreen?.().catch(() => undefined);
       }
@@ -357,13 +346,14 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
     if (!wrap) {
       return;
     }
+    const canvasWrap = canvasWrapRef.current;
     const canvas = getEngineCanvas(engineCanvasBox.width, engineCanvasBox.height);
     canvas.className = styles.canvas;
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', 'Classic FPS game');
     canvas.removeAttribute('aria-hidden');
-    if (canvas.parentNode !== wrap) {
-      wrap.insertBefore(canvas, wrap.firstChild);
+    if (canvasWrap && canvas.parentNode !== canvasWrap) {
+      canvasWrap.appendChild(canvas);
     }
     canvasRef.current = canvas;
 
@@ -374,7 +364,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
         void boot();
         return;
       }
-      if (status === 'running' && options.enableMouse !== false) {
+      if (status === 'running' && enableMouse !== false) {
         void requestMouseCapture();
         return;
       }
@@ -402,19 +392,26 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
       // teardownEngine() via handleRef.dispose() in the cleanup effect.
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioLocked, status, options.enableMouse, styles.canvas]);
+  }, [audioLocked, enableMouse, status, styles.canvas]);
 
-  // Keep the persistent canvas's CSS display size in sync with React state.
-  // Do NOT change canvas.width/height after init — that would clear the
-  // WebGL context and kill the live game.
+  // Size and center the canvasWrap container via explicit pixel arithmetic.
+  // Emscripten never touches this div, so inline style assignments are safe.
+  // Use the live wrapper rect rather than panel props so offsets match the
+  // actual rendered box after Grafana layout/fullscreen changes.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
+    const cw = canvasWrapRef.current;
+    const wrap = wrapRef.current;
+    if (!cw || !wrap) {
       return;
     }
-    canvas.style.width = `${displayCanvasBox.width}px`;
-    canvas.style.height = `${displayCanvasBox.height}px`;
-  }, [displayCanvasBox.width, displayCanvasBox.height]);
+    const rect = wrap.getBoundingClientRect();
+    const cw_w = displayCanvasBox.width;
+    const cw_h = displayCanvasBox.height;
+    cw.style.width = `${cw_w}px`;
+    cw.style.height = `${cw_h}px`;
+    cw.style.left = `${Math.floor((rect.width - cw_w) / 2)}px`;
+    cw.style.top = `${Math.floor((rect.height - cw_h) / 2)}px`;
+  }, [displayCanvasBox.width, displayCanvasBox.height, width, height]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -437,7 +434,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
         return;
       }
 
-      setMouseMessage(locked ? null : options.enableMouse === false ? null : 'Click 🖱 or canvas to capture mouse.');
+      setMouseMessage(locked ? null : enableMouse === false ? null : 'Click 🖱 or canvas to capture mouse.');
     };
 
     const onPointerLockError = () => {
@@ -454,7 +451,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
       document.removeEventListener('pointerlockerror', onPointerLockError);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options.enableMouse]);
+  }, [enableMouse]);
 
   useEffect(() => {
     if (!inputCaptured) {return;}
@@ -478,10 +475,10 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
       window.removeEventListener('keyup', onWindowKeyCapture, true);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputCaptured, options.enableMouse]);
+  }, [enableMouse, inputCaptured]);
 
   useEffect(() => {
-    if (status !== 'running' || options.enableMouse === false) {return;}
+    if (status !== 'running' || enableMouse === false) {return;}
 
     const win = window as GoomWindow;
     const pressedButtons = pressedMouseButtonsRef.current;
@@ -566,7 +563,7 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
       releaseMouseButtons();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, options.enableMouse]);
+  }, [enableMouse, status]);
 
   useEffect(() => {
     if (!inputCaptured) {return;}
@@ -633,14 +630,15 @@ export const GameCanvas: React.FC<Props> = ({ options, width, height }) => {
         tabIndex={-1}
         aria-hidden="true"
       />
-      {/* The engine canvas is a persistent singleton managed outside React
-          (see getEngineCanvas/parkEngineCanvas in lib/engine.ts). It is
-          appended into this wrap on mount and moved back to a hidden
-          parking host on unmount, keeping the WebGL context alive across
-          panel re-mounts (edit mode, dashboard switch, etc.). */}
+      {/* canvasWrap is sized by React (Emscripten never touches it) and
+          centered via absolute positioning. The engine canvas is appended
+          inside it and fills it 100%×100% via a stylesheet !important rule
+          that beats Emscripten's plain canvas.style.width/height assignments. */}
+      <div ref={canvasWrapRef} className={styles.canvasWrap} />
       <Hud
         containerRef={wrapRef}
         running={status === 'running'}
+        mutedOnLoad={muteOnLoad}
       />
       {status !== 'running' && (
         <div className={styles.overlay} role="status" aria-live="polite">
@@ -708,11 +706,20 @@ const getStyles = (theme: GrafanaTheme2) => ({
       border-radius: 0;
     }
   `,
+  canvasWrap: css`
+    position: absolute;
+    overflow: hidden;
+  `,
   canvas: css`
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* !important beats Emscripten's SDL2 plain canvas.style.width/height
+       assignments (inline without !important < stylesheet with !important). */
+    width: 100% !important;
+    height: 100% !important;
     display: block;
     image-rendering: pixelated;
-    max-width: 100%;
-    max-height: 100%;
     outline: none;
     &:focus {
       box-shadow: inset 0 0 0 2px ${theme.colors.primary.main};

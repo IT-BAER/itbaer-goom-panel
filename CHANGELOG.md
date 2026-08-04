@@ -6,6 +6,37 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-04
+
+First catalog release.
+
+### Fixed
+
+- The top of the frame was cut off: the engine renders 4:3 (`aspect_ratio_correct`
+  defaults on, 320x240), while the backbuffer was built from 320x200. Render
+  height is now 240 and `aspect_ratio_correct` is pinned to 1.
+- Unpainted black bars around the game: with no `-width`/`-height` the engine
+  used its 800x600 default times the device pixel ratio, ignoring the canvas.
+  The engine now owns the backbuffer and is told the panel's size.
+- The canvas ignored the panel width when fitting: it is now contain-fit on
+  both axes.
+- Panel config keys (`novert`, `aspect_ratio_correct` and six others) were
+  written to a config file the engine never reads; they are now passed via
+  `-extraconfig`.
+
+### Added
+
+- HUD mute button, toggled at runtime by disconnecting the SDL2 audio graph
+  node. A context suspend does not hold: Emscripten auto-resumes it on the
+  next keypress. Separate from the `Mute on load` boot option.
+- Jest unit tests for the canvas fit, engine window args, and mute.
+
+### Changed
+
+- `vendor/doom-wasm` points at `IT-BAER/doom-wasm` branch `gp-doom`, which
+  carries the patched Emscripten flags. The pinned commit only ever existed
+  locally before, so every clone with `submodules: recursive` failed.
+
 ### Added
 
 - Sound effects now work: patched `vendor/doom-wasm/configure.ac` Emscripten
@@ -33,4 +64,5 @@ All notable changes to this project are documented here. Format follows
 - Project README with trademark disclaimer and usage guide.
 - Overlaid canonical `SECURITY.md` and `CONTRIBUTING.md` from `grafana-mp`.
 
-[Unreleased]: https://github.com/IT-BAER/itbaer-goom-panel/compare/HEAD...HEAD
+[Unreleased]: https://github.com/IT-BAER/itbaer-goom-panel/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/IT-BAER/itbaer-goom-panel/releases/tag/v1.0.0
