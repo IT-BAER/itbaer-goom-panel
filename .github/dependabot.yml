@@ -11,6 +11,11 @@ updates:
       exclude:
         - '@grafana/plugin-e2e'
     open-pull-requests-limit: 5
+    ignore:
+      # glob >=12 stops matching the backslash-separated absolute path that
+      # .config/bundler/utils.ts builds, leaving webpack with zero entries.
+      - dependency-name: 'glob'
+        versions: ['>=12']
     commit-message:
       prefix: 'chore'
       include: 'scope'
