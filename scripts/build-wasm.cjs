@@ -15,5 +15,10 @@ const args = isWin
   ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(here, "build-wasm.ps1"), ...extraArgs]
   : [path.join(here, "build-wasm.sh"), ...extraArgs];
 
-const result = spawnSync(cmd, args, { stdio: "inherit" });
+// Windows PowerShell 5.1 started from a PowerShell 7 session inherits PS7's PSModulePath,
+// loads the wrong Microsoft.PowerShell.Utility and loses Get-FileHash. Let it rebuild its own.
+const env = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !isWin || k.toLowerCase() !== "psmodulepath")
+);
+const result = spawnSync(cmd, args, { stdio: "inherit", env });
 process.exit(result.status === null ? 1 : result.status);
