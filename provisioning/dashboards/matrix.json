@@ -68,7 +68,7 @@
       "id": 14,
       "options": {
         "wadSource": "url",
-        "wadUrl": "http://localhost:3001/public/plugins/itbaer-goom-panel/public/wads/freedoom1.wad",
+        "wadUrl": "/public/plugins/itbaer-goom-panel/public/wads/freedoom1.wad",
         "wadSha": "",
         "controls": "wasd",
         "muteOnLoad": true,
@@ -82,7 +82,7 @@
       "id": 15,
       "options": {
         "wadSource": "url",
-        "wadUrl": "http://localhost:3001/public/plugins/itbaer-goom-panel/does-not-exist.wad",
+        "wadUrl": "/public/plugins/itbaer-goom-panel/does-not-exist.wad",
         "wadSha": "",
         "controls": "wasd",
         "muteOnLoad": true,

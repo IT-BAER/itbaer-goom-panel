@@ -41,6 +41,7 @@
   "author": "IT-BAER",
   "license": "GPL-3.0-or-later",
   "overrides": {
+    "dompurify": "^3.4.17",
     "immutable": "^5.1.9",
     "js-cookie": "^3.0.8"
   },

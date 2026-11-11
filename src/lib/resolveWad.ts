@@ -58,9 +58,9 @@ export async function resolveWad(options: GoomOptions): Promise<ResolvedWad> {
   return { bytes, name: 'freedoom1.wad', sha, source: 'freedoom' };
 }
 
-/** Only allow http(s) URLs. Throws on anything else. */
+/** Only allow http(s) URLs; relative URLs resolve against the Grafana page. Throws on anything else. */
 export function safeHttpUrl(input: string): string {
-  const u = new URL(input);
+  const u = new URL(input, window.location.href);
   if (u.protocol !== 'http:' && u.protocol !== 'https:') {
     throw new Error(`Refusing non-http(s) WAD URL: ${u.protocol}`);
   }
