@@ -49,6 +49,8 @@ emconfigure autoreconf -fiv
 ac_cv_exeext='.html' emconfigure ./configure --host=none-none-none
 emmake make -j`$(nproc)
 "@
+# With core.autocrlf=true this file is checked out CRLF; bash rejects "pipefail\r".
+$bashScript = $bashScript -replace "`r", ''
 
 # Normalize mount path for Docker on Windows.
 $mount = (Resolve-Path -LiteralPath $VendorDir).Path
